@@ -1,4 +1,8 @@
 import network.client as client
+import tensorflow as tf
+
+import numpy as np
+from scipy.signal import butter,filtfilt
 
 from kapibara_audio import KapibaraAudio
 from microphone import Microphone
@@ -6,6 +10,17 @@ from microphone import Microphone
 mic=Microphone(chunk=16000)
 
 model=KapibaraAudio('./best_model')
+
+
+def design_butter_lowpass_filter(cutoff,fs,order):
+    normal_cutoff = (2*cutoff) / fs
+    # Get the filter coefficients 
+    b, a = butter(order, normal_cutoff, btype='lowpass',analog=False)
+
+    return b,a
+
+
+b,a = design_butter_lowpass_filter(1000.0,16000.0,2)
 
 
 
@@ -27,6 +42,15 @@ data = {
 with client.connect('192.168.50.42:5051') as channels:
     stub=client.get_stub(channels)
     while True:
+
+        audio=mic.record(2)
+
+        audio=filtfilt(b,a,audio).astype(np.int16)
+
+        audio=tf.cast(audio,dtype=tf.float32)
+
+        output=model.input(audio)
+
         print("Send Command!")
         msg=client.process_data(stub,data)
         print(msg)
