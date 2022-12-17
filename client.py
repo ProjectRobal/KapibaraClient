@@ -7,6 +7,8 @@ from scipy.signal import butter,filtfilt
 from kapibara_audio import KapibaraAudio
 from microphone import Microphone
 
+import emotions
+
 mic=Microphone(chunk=16000)
 
 model=KapibaraAudio('./best_model')
@@ -24,7 +26,7 @@ b,a = design_butter_lowpass_filter(1000.0,16000.0,2)
 
 
 
-data = {
+data:dict = {
     "Motors":
     {
         "speedA":0,
@@ -35,9 +37,27 @@ data = {
     "Servos":
     {
         "pwm1":45,
-        "pwm2":135,
+        "pwm2":45,
     }
 }
+
+
+
+moods:dict={
+    "neutral":emotions.Neutral(data["Servos"]),
+    "unsettling":emotions.Unsettlment(data["Servos"]),
+    "pleasent":emotions.Pleasure(data["Servos"]),
+    "scary":emotions.Fear(data["Servos"]),
+    "nervous":emotions.Anger(data["Servos"])
+}
+
+curr_mood:emotions.Emotion=moods["neutral"]
+
+
+def select_mood(output):
+    global curr_mood
+    curr_mood=moods[output]
+
 
 with client.connect('192.168.50.42:5051') as channels:
     stub=client.get_stub(channels)
@@ -50,8 +70,14 @@ with client.connect('192.168.50.42:5051') as channels:
         audio=tf.cast(audio,dtype=tf.float32)
 
         output=model.input(audio)
+        #output="nervous"
+
+        select_mood(output)
+
+        curr_mood.loop()
+        print(output)
 
         print("Send Command!")
         msg=client.process_data(stub,data)
-        print(msg)
+        #print(msg)
 
